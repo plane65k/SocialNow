@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SocialNOW</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css"> <!-- Adjusted to absolute path -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
     <style>
         #commentModal {
@@ -31,7 +31,7 @@
 </head>
 <body>
     <div class="header">
-        <h1><img id="mainLogo" src="" alt="Logo" style="height: 80px; width: 300px; object-fit: contain;"></h1>
+        <h1 id="homeLogo" class="logo-text">SocialNOW</h1>
         <div class="user-actions">
             <span class="user-info">👤 <span id="username"></span></span>
             <button onclick="logout()" class="logout-btn">Logout</button>
@@ -105,22 +105,6 @@
         </div>
     </div>
 
-    <script>
-        function updateLogo() {
-            const logoUrl = document.getElementById('logoUrl').value.trim();
-            if (logoUrl) {
-                document.querySelector('.header h1').innerHTML = `<img src="${logoUrl}" alt="Logo" style="height: 32px; vertical-align: middle;"> SocialNOW`;
-                localStorage.setItem('customLogo', logoUrl);
-            }
-        }
-
-        // Load custom logo if exists
-        const savedLogo = localStorage.getItem('customLogo');
-        if (savedLogo) {
-            document.getElementById('mainLogo').src = savedLogo;
-        }
-    </script>
-
     <div id="devUpdateScreen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 9999; color: white; display: flex; justify-content: center; align-items: center; font-size: 24px;">
         <div style="text-align: center;">
             <h1>🚧 Update in Progress</h1>
@@ -149,6 +133,13 @@
         if (username === 'root') {
             document.querySelector('.tab-container').innerHTML += '<button class="tab" onclick="showAdmin()">Admin</button>';
             document.getElementById('adminPanel').style.display = 'none';
+        }
+
+        // Load custom logo if exists
+        const savedLogo = localStorage.getItem('customLogo');
+        if (savedLogo) {
+            const logoElement = document.getElementById('homeLogo');
+            logoElement.innerHTML = `<img src="${savedLogo}" alt="SocialNOW Logo" style="height: 80px; width: 300px; object-fit: contain;">`;
         }
 
         function showFeed() {
@@ -217,11 +208,21 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('mainLogo').src = data.logoUrl;
+                    const logoElement = document.getElementById('homeLogo');
+                    logoElement.innerHTML = `<img src="${data.logoUrl}" alt="SocialNOW Logo" style="height: 80px; width: 300px; object-fit: contain;">`;
                     localStorage.setItem('customLogo', data.logoUrl);
                 }
             } catch (error) {
                 console.error('Error uploading logo:', error);
+            }
+        }
+
+        function updateLogo() {
+            const logoUrl = document.getElementById('logoUrl').value.trim();
+            if (logoUrl) {
+                const logoElement = document.getElementById('homeLogo');
+                logoElement.innerHTML = `<img src="${logoUrl}" alt="SocialNOW Logo" style="height: 80px; width: 300px; object-fit: contain;">`;
+                localStorage.setItem('customLogo', logoUrl);
             }
         }
 
