@@ -1,10 +1,9 @@
 const express = require('express');
+const multer = require('multer'); // Added missing import
 const app = express();
-app.use(express.static('public'));
-app.get('/', (req, res) => res.sendFile('auth.html', { root: 'public' }));
-// ... rest of your code ...
+
+// Use Render's dynamic port
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server running on port ${port}`));
 
 // In-memory stores (no persistent filesystem on free Render)
 let users = [];
@@ -22,10 +21,9 @@ if (!users.find(u => u.username === 'root')) {
   });
 }
 
-// Multer setup for in-memory image uploads (no disk on free Render)
+// Multer setup for in-memory image uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-app.use('/uploads', express.static('uploads')); // Note: This won't persist images—see below
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -89,7 +87,7 @@ app.post('/posts', authMiddleware, upload.single('image'), (req, res) => {
   let imageUrl;
   if (req.file) {
     const imageId = Date.now().toString();
-    uploadedImages[imageId] = req.file.buffer; // Store in memory
+    uploadedImages[imageId] = req.file.buffer;
     imageUrl = `/uploads/${imageId}`;
   } else {
     imageUrl = req.body.imageUrl;
@@ -120,35 +118,29 @@ app.get('/uploads/:id', (req, res) => {
 app.post('/posts/:id/comments', authMiddleware, (req, res) => {
   const postId = parseInt(req.params.id);
   const { comment } = req.body;
-
   if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
     return res.status(400).json({ error: 'Comment cannot be empty' });
   }
-
   if (comment.trim().length > 500) {
     return res.status(400).json({ error: 'Comment is too long (max 500 characters)' });
   }
-
   const post = posts.find(p => p.id === postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
-
   const newComment = { 
     username: req.username, 
     text: comment.trim(),
     timestamp: new Date().toISOString()
   };
-
   post.comments.push(newComment);
   res.json(post);
 });
 
-// Like a post (only once per user)
+// Like a post
 app.post('/posts/:id/like', authMiddleware, (req, res) => {
   const postId = parseInt(req.params.id);
   const post = posts.find(p => p.id === postId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
   if (post.likedBy.includes(req.username)) return res.status(400).json({ error: 'You already liked this post' });
-
   post.likes += 1;
   post.likedBy.push(req.username);
   res.json(post);
@@ -174,7 +166,7 @@ app.post('/messages', authMiddleware, (req, res) => {
   res.json(message);
 });
 
-// Root Admin Endpoints
+// Admin Endpoints (simplified)
 app.delete('/admin/users/:username', authMiddleware, rootMiddleware, (req, res) => {
   const usernameToDelete = req.params.username;
   if (usernameToDelete === 'root') return res.status(400).json({ error: 'Cannot delete root account' });
@@ -187,41 +179,6 @@ app.delete('/admin/users/:username', authMiddleware, rootMiddleware, (req, res) 
   res.json({ message: `User ${usernameToDelete} deleted` });
 });
 
-app.delete('/admin/chats', authMiddleware, rootMiddleware, (req, res) => {
-  messages = [];
-  res.json({ message: 'All chats deleted' });
-});
-
-app.delete('/admin/posts/:id', authMiddleware, rootMiddleware, (req, res) => {
-  const postId = parseInt(req.params.id);
-  const postIndex = posts.findIndex(p => p.id === postId);
-  if (postIndex === -1) return res.status(404).json({ error: 'Post not found' });
-  posts.splice(postIndex, 1);
-  res.json({ message: `Post ${postId} deleted` });
-});
-
-app.delete('/admin/storage', authMiddleware, rootMiddleware, (req, res) => {
-  users = users.filter(u => u.username === 'root');
-  posts = [];
-  messages = [];
-  sessions = Object.fromEntries(Object.entries(sessions).filter(([_, username]) => username === 'root'));
-  uploadedImages = {};
-  res.json({ message: 'All storage cleared except root account' });
-});
-
-app.post('/admin/logo', authMiddleware, rootMiddleware, upload.single('logo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const logoId = Date.now().toString();
-  uploadedImages[logoId] = req.file.buffer;
-  const logoUrl = `/uploads/${logoId}`;
-  res.json({ logoUrl });
-});
-
-app.get('/admin/users', authMiddleware, rootMiddleware, (req, res) => {
-  res.json(users);
-});
-
-// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
