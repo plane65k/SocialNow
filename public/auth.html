@@ -4,18 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Auth - SocialNOW</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="auth-container">
         <div class="logo-container">
-            <img id="loginLogo" src="" alt="Logo" style="height: 80px;">
+            <h1 id="loginLogo" class="logo-text">SocialNOW</h1>
         </div>
         <script>
+            // Optional: Replace text with custom logo image if set by admin
             const savedLogo = localStorage.getItem('customLogo');
             if (savedLogo) {
-                document.getElementById('loginLogo').src = savedLogo;
+                const logoElement = document.getElementById('loginLogo');
+                logoElement.innerHTML = `<img src="${savedLogo}" alt="SocialNOW Logo" style="height: 80px; width: auto; object-fit: contain;">`;
             }
         </script>
         <div class="tab-container">
