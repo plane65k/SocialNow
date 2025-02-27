@@ -10,14 +10,8 @@
 <body>
     <div class="auth-container">
         <div class="logo-container">
-            <img id="loginLogo" src="" alt="Logo" style="height: 80px;">
+            <h1 style="color: #00cc00; font-family: 'Montserrat', sans-serif; font-size: 48px;">SocialNOW</h1>
         </div>
-        <script>
-            const savedLogo = localStorage.getItem('customLogo');
-            if (savedLogo) {
-                document.getElementById('loginLogo').src = savedLogo;
-            }
-        </script>
         <div class="tab-container">
             <button class="tab active" onclick="showLogin()">Login</button>
             <button class="tab" onclick="showRegister()">Register</button>
