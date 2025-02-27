@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - InstaMock</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-container">
+            <img id="loginLogo" src="" alt="Logo" style="height: 120px; width: 300px; object-fit: contain;">
+        </div>
+        <script>
+            const savedLogo = localStorage.getItem('customLogo');
+            if (savedLogo) {
+                document.getElementById('loginLogo').src = savedLogo;
+            }
+        </script>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Log In</button>
+        </form>
+        <p>Default: user / pass123</p>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const { sessionId } = await response.json();
+                localStorage.setItem('sessionId', sessionId);
+                window.location.href = '/index.html';
+            } else {
+                alert('Login failed. Check your credentials.');
+            }
+        });
+    </script>
+</body>
+</html>

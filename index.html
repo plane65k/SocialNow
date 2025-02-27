@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocialNOW</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+    <style>
+        #commentModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><img id="mainLogo" src="" alt="Logo" style="height: 80px; width: 300px; object-fit: contain;"></h1>
+        <div class="user-actions">
+            <span class="user-info">👤 <span id="username"></span></span>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+    </div>
+
+    <div class="tab-container">
+        <button class="tab active" onclick="showFeed()">Feed</button>
+        <button class="tab" onclick="showChat()">Chat</button>
+    </div>
+
+    <!-- Feed Section -->
+    <div id="feedSection" class="section">
+        <div class="post-form">
+            <div class="upload-container">
+                <label for="imageFile" class="upload-button">
+                    📁 Choose File from Computer
+                    <input type="file" id="imageFile" accept="image/*" style="display: none" onchange="updateFileLabel(this)">
+                </label>
+                <span id="fileName">No file chosen</span>
+                <div class="divider">- OR -</div>
+                <input type="text" id="imageUrl" placeholder="Paste Image URL">
+            </div>
+            <textarea id="caption" placeholder="Write a caption..."></textarea>
+            <button onclick="createPost()">Share</button>
+        </div>
+        <div class="feed" id="feed"></div>
+    </div>
+
+    <!-- Chat Section -->
+    <div id="chatSection" class="section" style="display: none;">
+        <div class="chat-form">
+            <input type="text" id="recipient" placeholder="Username for private chat (leave blank for group)">
+            <input type="text" id="chatInput" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+    </div>
+
+    <!-- Admin Panel (Root Only) -->
+    <div id="adminPanel" class="section" style="display: none;">
+        <h2>Admin Panel</h2>
+        <div class="admin-form">
+            <input type="file" id="logoFile" accept="image/*">
+            <button onclick="uploadLogo()">Update Logo</button>
+        </div>
+        <div class="admin-form">
+            <h3>Registered Users</h3>
+            <div id="userList" class="user-list"></div>
+        </div>
+        <div class="admin-form">
+            <input type="text" id="deleteUser" placeholder="Username to delete">
+            <button onclick="deleteUser()">Delete User</button>
+        </div>
+        <div class="admin-form">
+            <button onclick="deleteChats()">Delete All Chats</button>
+        </div>
+        <div class="admin-form">
+            <input type="number" id="deletePostId" placeholder="Post ID to delete">
+            <button onclick="deletePost()">Delete Post</button>
+        </div>
+        <div class="admin-form">
+            <button onclick="clearStorage()">Clear All Storage</button>
+        </div>
+        <div class="admin-form">
+            <button onclick="toggleDevScreenGlobal()">Toggle Dev Screen for All Users</button>
+        </div>
+        <div class="admin-form">
+            <input type="text" id="logoUrl" placeholder="Enter new logo URL">
+            <button onclick="updateLogo()">Update Logo</button>
+        </div>
+    </div>
+
+    <script>
+        function updateLogo() {
+            const logoUrl = document.getElementById('logoUrl').value.trim();
+            if (logoUrl) {
+                document.querySelector('.header h1').innerHTML = `<img src="${logoUrl}" alt="Logo" style="height: 32px; vertical-align: middle;"> SocialNOW`;
+                localStorage.setItem('customLogo', logoUrl);
+            }
+        }
+
+        // Load custom logo if exists
+        const savedLogo = localStorage.getItem('customLogo');
+        if (savedLogo) {
+            document.getElementById('mainLogo').src = savedLogo;
+        }
+    </script>
+
+    <div id="devUpdateScreen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 9999; color: white; display: flex; justify-content: center; align-items: center; font-size: 24px;">
+        <div style="text-align: center;">
+            <h1>🚧 Update in Progress</h1>
+            <p>Our developers are working on improvements.<br>Please check back later.</p>
+        </div>
+    </div>
+
+    <div id="commentModal">
+        <div class="modal-content">
+            <img id="modalImage" src="" alt="Post Image" style="max-width: 100%; height: auto;">
+            <p id="modalCaption"></p>
+            <p>Commenting as: <span id="modalUsername"></span></p>
+            <textarea id="modalCommentText" placeholder="Write your comment here..."></textarea>
+            <button onclick="submitModalComment()">Submit Comment</button>
+            <button onclick="document.getElementById('commentModal').style.display = 'none';">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const sessionId = localStorage.getItem('sessionId');
+        if (!sessionId) window.location.href = '/auth.html';
+        let postInterval, chatInterval;
+        const username = localStorage.getItem('username');
+        let currentPostId = null;
+
+        if (username === 'root') {
+            document.querySelector('.tab-container').innerHTML += '<button class="tab" onclick="showAdmin()">Admin</button>';
+            document.getElementById('adminPanel').style.display = 'none';
+        }
+
+        function showFeed() {
+            const feedSection = document.getElementById('feedSection');
+            const chatSection = document.getElementById('chatSection');
+
+            chatSection.style.opacity = '0';
+            chatSection.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                chatSection.style.display = 'none';
+                feedSection.style.display = 'block';
+                setTimeout(() => {
+                    feedSection.style.opacity = '1';
+                    feedSection.style.transform = 'translateY(0)';
+                }, 50);
+            }, 300);
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.querySelectorAll('.tab')[1].classList.remove('active');
+            if (username === 'root') document.querySelectorAll('.tab')[2].classList.remove('active');
+            loadPosts();
+            clearInterval(chatInterval);
+            postInterval = setInterval(loadPosts, 2000);
+        }
+
+        function showChat() {
+            const feedSection = document.getElementById('feedSection');
+            const chatSection = document.getElementById('chatSection');
+
+            feedSection.style.opacity = '0';
+            feedSection.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                feedSection.style.display = 'none';
+                chatSection.style.display = 'block';
+                setTimeout(() => {
+                    chatSection.style.opacity = '1';
+                    chatSection.style.transform = 'translateY(0)';
+                }, 50);
+            }, 300);
+            document.querySelectorAll('.tab')[0].classList.remove('active');
+            document.querySelectorAll('.tab')[1].classList.add('active');
+            if (username === 'root') document.querySelectorAll('.tab')[2].classList.remove('active');
+            loadMessages();
+            clearInterval(postInterval);
+            chatInterval = setInterval(loadMessages, 2000);
+        }
+
+        async function uploadLogo() {
+            const fileInput = document.getElementById('logoFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('logo', file);
+
+            try {
+                const response = await fetch('/admin/logo', {
+                    method: 'POST',
+                    headers: {
+                        'X-Session-Id': sessionId
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('mainLogo').src = data.logoUrl;
+                    localStorage.setItem('customLogo', data.logoUrl);
+                }
+            } catch (error) {
+                console.error('Error uploading logo:', error);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/admin/users', {
+                    headers: {
+                        'X-Session-Id': sessionId
+                    }
+                });
+                const users = await response.json();
+                const userList = document.getElementById('userList');
+                userList.innerHTML = users.map(user => `
+                    <div>👤 ${user.username}${user.username === 'root' ? ' (admin)' : ''}</div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function showAdmin() {
+            document.getElementById('feedSection').style.display = 'none';
+            document.getElementById('chatSection').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'block';
+            document.querySelectorAll('.tab')[0].classList.remove('active');
+            document.querySelectorAll('.tab')[1].classList.remove('active');
+            document.querySelectorAll('.tab')[2].classList.add('active');
+            clearInterval(postInterval);
+            loadUsers();
+            clearInterval(chatInterval);
+        }
+
+        // Feed Functions
+        async function loadPosts() {
+            const response = await fetch('/posts', { headers: { 'x-session-id': sessionId } });
+            if (!response.ok) return window.location.href = '/auth.html';
+            const posts = await response.json();
+            document.getElementById('username').textContent = posts[0]?.username || localStorage.getItem('username');
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
+            posts.forEach(post => {
+                const existingPost = document.querySelector(`[data-post-id="${post.id}"]`);
+                if (existingPost) return;
+
+                const postElement = document.createElement('div');
+                postElement.className = 'post';
+                postElement.setAttribute('data-post-id', post.id);
+                const postIdDisplay = username === 'root' ? `<span class="post-id">ID: ${post.id}</span>` : '';
+                postElement.innerHTML = `
+                    <div class="post-header">
+                        <img src="https://images.squarespace-cdn.com/content/v1/5936fbebcd0f68f67d5916ff/19b38924-e394-467f-9929-ca3a4f9d11bc/person-placeholder-300x300.jpeg" alt="User">
+                        <span>${post.username}</span>
+                        ${postIdDisplay}
+                    </div>
+                    <img class="post-image" src="${post.imageUrl}" alt="Post">
+                    <div class="post-actions">
+                        <button onclick="likePost(${post.id})">❤️ ${post.likes}</button>
+                        <button>💬</button>
+                    </div>
+                    <div class="post-caption"><strong>${post.username}</strong> ${post.caption}</div>
+                    <div class="comments" id="comments-${post.id}">
+                        ${post.comments.map(c => `<div class="comment"><strong>${escapeHtml(c.username)}</strong> ${escapeHtml(c.text)}</div>`).join('')}
+                    </div>
+                    <div class="comment-form">
+                        <button onclick="openCommentModal(${post.id}, '${post.imageUrl}', '${post.caption}')">Add a comment...</button>
+                    </div>
+                `;
+                feed.appendChild(postElement);
+            });
+        }
+
+        async function createPost() {
+            const imageFile = document.getElementById('imageFile').files[0];
+            const imageUrl = document.getElementById('imageUrl').value;
+            const caption = document.getElementById('caption').value;
+            if (!caption || (!imageFile && !imageUrl)) return alert('Please provide an image and caption');
+
+            const formData = new FormData();
+            formData.append('caption', caption);
+            if (imageFile) formData.append('image', imageFile);
+            else formData.append('imageUrl', imageUrl);
+
+            await fetch('/posts', {
+                method: 'POST',
+                headers: { 'x-session-id': sessionId },
+                body: formData
+            });
+            document.getElementById('imageFile').value = '';
+            document.getElementById('imageUrl').value = '';
+            document.getElementById('caption').value = '';
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function addComment(postId) {
+            const commentInput = document.getElementById(`comment-${postId}`);
+            const comment = commentInput.value.trim();
+            if (!comment) {
+                alert('Please enter a comment');
+                return;
+            }
+
+            const commentButton = event.target;
+            commentButton.disabled = true;
+
+            try {
+                const response = await fetch(`/posts/${postId}/comments`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'x-session-id': sessionId 
+                    },
+                    body: JSON.stringify({ comment })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to add comment');
+                }
+
+                commentInput.value = '';
+
+                // Update just the comments section for this post
+                const commentsDiv = document.getElementById(`comments-${postId}`);
+                commentsDiv.innerHTML = data.comments.map(c => 
+                    `<div class="comment"><strong>${escapeHtml(c.username)}</strong> ${escapeHtml(c.text)}</div>`
+                ).join('');
+
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                commentButton.disabled = false;
+            }
+        }
+
+        async function likePost(postId) {
+            const response = await fetch(`/posts/${postId}/like`, {
+                method: 'POST',
+                headers: { 'x-session-id': sessionId }
+            });
+            if (!response.ok) {
+                const { error } = await response.json();
+                alert(error);
+            }
+        }
+
+        // Chat Functions
+        async function loadMessages() {
+            const response = await fetch('/messages', { headers: { 'x-session-id': sessionId } });
+            if (!response.ok) return window.location.href = '/auth.html';
+            const messages = await response.json();
+            const chat = document.getElementById('chatMessages');
+            chat.innerHTML = '';
+            messages.forEach(msg => {
+                const msgElement = document.createElement('div');
+                msgElement.className = 'chat-message';
+                const recipientText = msg.recipient ? `(to ${msg.recipient})` : '(group)';
+                msgElement.innerHTML = `<strong>${msg.sender}</strong> ${recipientText}: ${msg.text} <span class="timestamp">${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+                chat.appendChild(msgElement);
+            });
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = document.getElementById('chatInput').value;
+            const recipient = document.getElementById('recipient').value.trim();
+            if (!text) return;
+            await fetch('/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-session-id': sessionId },
+                body: JSON.stringify({ text, recipient: recipient || null })
+            });
+            document.getElementById('chatInput').value = '';
+        }
+
+        // Admin Functions
+        async function deleteUser() {
+            const username = document.getElementById('deleteUser').value.trim();
+            if (!username) return alert('Enter a username');
+            const response = await fetch(`/admin/users/${username}`, {
+                method: 'DELETE',
+                headers: { 'x-session-id': sessionId }
+            });
+            alert((await response.json()).message);
+            document.getElementById('deleteUser').value = '';
+        }
+
+        async function deleteChats() {
+            const response = await fetch('/admin/chats', {
+                method: 'DELETE',
+                headers: { 'x-session-id': sessionId }
+            });
+            alert((await response.json()).message);
+        }
+
+        async function deletePost() {
+            const postId = document.getElementById('deletePostId').value;
+            if (!postId) return alert('Enter a post ID');
+            const response = await fetch(`/admin/posts/${postId}`, {
+                method: 'DELETE',
+                headers: { 'x-session-id': sessionId }
+            });
+            alert((await response.json()).message);
+            document.getElementById('deletePostId').value = '';
+        }
+
+        async function clearStorage() {
+            if (!confirm('Are you sure you want to clear all storage? This cannot be undone.')) return;
+            const response = await fetch('/admin/storage', {
+                method: 'DELETE',
+                headers: { 'x-session-id': sessionId }
+            });
+            alert((await response.json()).message);
+        }
+
+        async function openCommentModal(postId, imageUrl, caption) {
+            currentPostId = postId;
+            const modalImage = document.getElementById('modalImage');
+            const commentBox = document.getElementById('modalCommentText');
+
+            modalImage.src = imageUrl;
+            modalImage.onload = function() {
+                const imageHeight = modalImage.offsetHeight;
+                commentBox.style.maxHeight = (imageHeight - 20) + 'px';
+            };
+
+            document.getElementById('modalCaption').textContent = caption;
+            document.getElementById('modalUsername').textContent = username;
+            document.getElementById('commentModal').style.display = 'flex';
+        }
+
+        async function submitModalComment() {
+            if (!currentPostId) return;
+            const comment = document.getElementById('modalCommentText').value.trim();
+            if (!comment) return;
+
+            const response = await fetch(`/posts/${currentPostId}/comments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-session-id': sessionId
+                },
+                body: JSON.stringify({ comment })
+            });
+
+            if (response.ok) {
+                document.getElementById('modalCommentText').value = '';
+                document.getElementById('commentModal').style.display = 'none';
+                loadPosts();
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('commentModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('commentModal')) {
+                document.getElementById('commentModal').style.display = 'none';
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('sessionId');
+            localStorage.removeItem('username');
+            window.location.href = '/auth.html';
+        }
+
+        function toggleDevScreenGlobal() {
+            const currentState = localStorage.getItem('globalDevUpdate') === 'true';
+            localStorage.setItem('globalDevUpdate', !currentState);
+            alert(`Developer update screen has been ${!currentState ? 'enabled' : 'disabled'} for all users`);
+        }
+
+        function checkDevScreen() {
+            const globalDevUpdate = localStorage.getItem('globalDevUpdate') === 'true';
+            const devScreen = document.getElementById('devUpdateScreen');
+            if (devScreen && !username === 'root' && globalDevUpdate) {
+                devScreen.style.display = 'flex';
+            } else if (devScreen) {
+                devScreen.style.display = 'none';
+            }
+        }
+
+        // Remove dev screen if root user
+        if (username === 'root') {
+            const devScreen = document.getElementById('devUpdateScreen');
+            if (devScreen) {
+                devScreen.remove();
+            }
+            const devUpdateBtn = document.querySelector('button[onclick="toggleDevUpdate()"]');
+            if (devUpdateBtn) {
+                devUpdateBtn.parentElement.remove();
+            }
+        }
+        
+        function updateFileLabel(input) {
+            const fileName = input.files[0] ? input.files[0].name : 'No file chosen';
+            document.getElementById('fileName').textContent = fileName;
+        }
+
+        checkDevScreen();
+        setInterval(checkDevScreen, 2000); // Check dev screen status periodically
+        showFeed(); // Start with feed and auto-refresh
+    </script>
+</body>
+</html>
