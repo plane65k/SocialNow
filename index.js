@@ -1,59 +1,38 @@
 const express = require('express');
 const multer = require('multer');
-const fs = require('node:fs');
 const app = express();
-const port = 3000;
 
-// In-memory stores (replace with database in production)
+// Use Render's dynamic port
+const port = process.env.PORT || 3000;
+
+// In-memory stores (no persistent filesystem on free Render)
 let users = [];
 let posts = [];
 let messages = [];
 let sessions = {};
 let uploadedImages = {};
 
-const saveData = (filename, data) => {
-  fs.writeFileSync(filename, JSON.stringify(data, null, 2));
-};
-
-const loadData = (filename) => {
-  try {
-    const data = fs.readFileSync(filename, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    return []; // Return empty array if file doesn't exist
-  }
-};
-
-// Load data from files on startup
-users = loadData('data_users.json');
-sessions = loadData('data_sessions.json');
-posts = loadData('data_posts.json');
-messages = loadData('data_messages.json');
-
-// Ensure root account exists
+// Ensure root account exists on startup
 if (!users.find(u => u.username === 'root')) {
   users.push({ 
     username: 'root', 
     password: 'rootdev', 
     profilePic: 'https://images.squarespace-cdn.com/content/v1/5936fbebcd0f68f67d5916ff/19b38924-e394-467f-9929-ca3a4f9d11bc/person-placeholder-300x300.jpeg' 
   });
-  saveData('data_users.json', users);
 }
 
-// Multer setup for image uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
+// Multer setup for in-memory image uploads (no disk on free Render)
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static('uploads')); // Note: This won't persist images—see below
 
 app.use(express.json());
 app.use(express.static('public'));
+
+// Serve auth.html as default route
+app.get('/', (req, res) => {
+  res.sendFile('auth.html', { root: 'public' });
+});
 
 // Register endpoint
 app.post('/register', (req, res) => {
@@ -66,10 +45,8 @@ app.post('/register', (req, res) => {
     password, 
     profilePic: 'https://images.squarespace-cdn.com/content/v1/5936fbebcd0f68f67d5916ff/19b38924-e394-467f-9929-ca3a4f9d11bc/person-placeholder-300x300.jpeg' 
   });
-  saveData('data_users.json', users);
   const sessionId = Date.now().toString();
   sessions[sessionId] = username;
-  saveData('data_sessions.json', sessions);
   res.json({ sessionId });
 });
 
@@ -81,7 +58,6 @@ app.post('/login', (req, res) => {
 
   const sessionId = Date.now().toString();
   sessions[sessionId] = username;
-  saveData('data_sessions.json', sessions);
   res.json({ sessionId });
 });
 
@@ -104,14 +80,16 @@ app.get('/posts', authMiddleware, (req, res) => {
   res.json(posts);
 });
 
-// Create a post with image upload
+// Create a post with image upload (in-memory)
 app.post('/posts', authMiddleware, upload.single('image'), (req, res) => {
   const { caption } = req.body;
   if (!caption || (!req.file && !req.body.imageUrl)) return res.status(400).json({ error: 'Missing fields' });
 
   let imageUrl;
   if (req.file) {
-    imageUrl = `/uploads/${req.file.filename}`;
+    const imageId = Date.now().toString();
+    uploadedImages[imageId] = req.file.buffer; // Store in memory
+    imageUrl = `/uploads/${imageId}`;
   } else {
     imageUrl = req.body.imageUrl;
   }
@@ -126,11 +104,10 @@ app.post('/posts', authMiddleware, upload.single('image'), (req, res) => {
     likedBy: [] 
   };
   posts.unshift(post);
-  saveData('data_posts.json', posts);
   res.json(post);
 });
 
-// Serve uploaded images
+// Serve uploaded images from memory
 app.get('/uploads/:id', (req, res) => {
   const imageId = req.params.id;
   if (!uploadedImages[imageId]) return res.status(404).send('Image not found');
@@ -161,7 +138,6 @@ app.post('/posts/:id/comments', authMiddleware, (req, res) => {
   };
 
   post.comments.push(newComment);
-  saveData('data_posts.json', posts);
   res.json(post);
 });
 
@@ -174,11 +150,10 @@ app.post('/posts/:id/like', authMiddleware, (req, res) => {
 
   post.likes += 1;
   post.likedBy.push(req.username);
-  saveData('data_posts.json', posts);
   res.json(post);
 });
 
-// Get all chat messages (filtered for user)
+// Get all chat messages
 app.get('/messages', authMiddleware, (req, res) => {
   res.json(messages.filter(m => !m.recipient || m.recipient === req.username || m.sender === req.username));
 });
@@ -195,7 +170,6 @@ app.post('/messages', authMiddleware, (req, res) => {
     timestamp: new Date().toISOString() 
   };
   messages.push(message);
-  saveData('data_messages.json', messages);
   res.json(message);
 });
 
@@ -209,16 +183,11 @@ app.delete('/admin/users/:username', authMiddleware, rootMiddleware, (req, res) 
   Object.keys(sessions).forEach(sid => {
     if (sessions[sid] === usernameToDelete) delete sessions[sid];
   });
-  saveData('data_users.json', users);
-  saveData('data_posts.json', posts);
-  saveData('data_messages.json', messages);
-  saveData('data_sessions.json', sessions);
   res.json({ message: `User ${usernameToDelete} deleted` });
 });
 
 app.delete('/admin/chats', authMiddleware, rootMiddleware, (req, res) => {
   messages = [];
-  saveData('data_messages.json', messages);
   res.json({ message: 'All chats deleted' });
 });
 
@@ -227,7 +196,6 @@ app.delete('/admin/posts/:id', authMiddleware, rootMiddleware, (req, res) => {
   const postIndex = posts.findIndex(p => p.id === postId);
   if (postIndex === -1) return res.status(404).json({ error: 'Post not found' });
   posts.splice(postIndex, 1);
-  saveData('data_posts.json', posts);
   res.json({ message: `Post ${postId} deleted` });
 });
 
@@ -237,16 +205,14 @@ app.delete('/admin/storage', authMiddleware, rootMiddleware, (req, res) => {
   messages = [];
   sessions = Object.fromEntries(Object.entries(sessions).filter(([_, username]) => username === 'root'));
   uploadedImages = {};
-  saveData('data_users.json', users);
-  saveData('data_posts.json', posts);
-  saveData('data_messages.json', messages);
-  saveData('data_sessions.json', sessions);
   res.json({ message: 'All storage cleared except root account' });
 });
 
 app.post('/admin/logo', authMiddleware, rootMiddleware, upload.single('logo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const logoUrl = `/uploads/${req.file.filename}`;
+  const logoId = Date.now().toString();
+  uploadedImages[logoId] = req.file.buffer;
+  const logoUrl = `/uploads/${logoId}`;
   res.json({ logoUrl });
 });
 
@@ -254,6 +220,7 @@ app.get('/admin/users', authMiddleware, rootMiddleware, (req, res) => {
   res.json(users);
 });
 
+// Start server
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });
