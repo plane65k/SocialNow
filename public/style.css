@@ -23,6 +23,18 @@ body {
     animation: fadeIn 0.8s ease-out forwards;
 }
 
+.logo-text {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700; /* Bold */
+    font-size: 48px; /* Larger for logo effect */
+    color: #00FF00; /* Lime green */
+    text-align: center;
+    margin: 0;
+    padding: 20px 0; /* Spacing */
+    letter-spacing: 1px; /* Modern touch */
+}
+
+/* Remove or override .header h1 to avoid duplication */
 .header {
     background: white;
     padding: 15px;
@@ -32,12 +44,13 @@ body {
     align-items: center;
 }
 
+/* Override .header h1 if it conflicts with .logo-text */
 .header h1 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
     font-size: 32px;
     margin: 0;
-    color: #00cc00;
+    color: #00cc00; /* Keep this for other h1s if needed, but .logo-text takes precedence */
 }
 
 .user-actions {
@@ -77,12 +90,13 @@ body {
     padding: 20px;
 }
 
+/* Override .auth-container h1 if needed */
 .auth-container h1 {
     font-family: 'Montserrat', sans-serif;
     font-weight: 700;
     font-size: 48px;
     margin-bottom: 20px;
-    color: #00cc00;
+    color: #00cc00; /* Keep for other h1s, but .logo-text takes precedence */
 }
 
 .tab-container {
@@ -291,7 +305,7 @@ body {
 .post-header .post-id {
     font-size: 12px;
     color: #8e8e8e;
-    margin-left: auto; /* Pushes ID to the right */
+    margin-left: auto;
 }
 
 .post-image {
