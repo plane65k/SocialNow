@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth - SocialNOW</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="logo-container">
+            <img id="loginLogo" src="" alt="Logo" style="height: 80px;">
+        </div>
+        <script>
+            const savedLogo = localStorage.getItem('customLogo');
+            if (savedLogo) {
+                document.getElementById('loginLogo').src = savedLogo;
+            }
+        </script>
+        <div class="tab-container">
+            <button class="tab active" onclick="showLogin()">Login</button>
+            <button class="tab" onclick="showRegister()">Register</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+            <input type="text" id="loginUsername" placeholder="Username" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit">Log In</button>
+        </form>
+
+        <form id="registerForm" class="auth-form" style="display: none;">
+            <input type="text" id="regUsername" placeholder="Username" required>
+            <input type="password" id="regPassword" placeholder="Password" required>
+            <div class="rules-container">
+                <div class="rules-scroll">
+                    <h3>SocialNOW Community Rules</h3>
+                    <ol>
+                        <li><strong>Respect All Users</strong><br>
+                        Treat others with kindness and respect. No harassment, bullying, or discrimination.</li>
+                        <li><strong>Keep Content Appropriate</strong><br>
+                        No explicit, violent, or illegal content.</li>
+                        <li><strong>One Like Per Post</strong><br>
+                        Users may only like a post once.</li>
+                        <li><strong>Use Chat Responsibly</strong><br>
+                        No harassment or spam in private/group chats.</li>
+                        <li><strong>No Impersonation</strong><br>
+                        Don't pretend to be others or access unauthorized accounts.</li>
+                        <li><strong>Content Ownership</strong><br>
+                        Only post content you own or have permission to use.</li>
+                        <li><strong>Owner Authority</strong><br>
+                        Owners can delete accounts, remove content, and clear storage.</li>
+                        <li><strong>Report Issues</strong><br>
+                        Report bugs and violations to owners.</li>
+                        <li><strong>Account Responsibility</strong><br>
+                        Users are responsible for account security and activity.</li>
+                        <li><strong>Compliance with Laws</strong><br>
+                        All activity must comply with applicable laws.</li>
+                    </ol>
+                </div>
+                <label class="rules-agreement">
+                    <input type="checkbox" id="rulesAgreement" required>
+                    I agree to follow the SocialNOW Community Rules
+                </label>
+            </div>
+            <button type="submit">Register</button>
+        </form>
+    </div>
+
+    <script>
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.querySelectorAll('.tab')[1].classList.remove('active');
+        }
+
+        function showRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            document.querySelectorAll('.tab')[0].classList.remove('active');
+            document.querySelectorAll('.tab')[1].classList.add('active');
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (response.ok) {
+                const { sessionId } = await response.json();
+                localStorage.setItem('sessionId', sessionId);
+                localStorage.setItem('username', username);
+                document.body.style.opacity = '0';
+                document.body.style.transform = 'scale(1.1)';
+                document.body.style.transition = 'all 0.5s ease-out';
+                setTimeout(() => {
+                    window.location.href = '/index.html';
+                }, 500);
+            } else {
+                alert('Login failed. Check your credentials.');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (response.ok) {
+                const { sessionId } = await response.json();
+                localStorage.setItem('sessionId', sessionId);
+                localStorage.setItem('username', username);
+                window.location.href = '/index.html';
+            } else {
+                const { error } = await response.json();
+                alert(`Registration failed: ${error}`);
+            }
+        });
+    </script>
+</body>
+</html>
