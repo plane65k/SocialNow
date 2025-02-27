@@ -1,9 +1,10 @@
 const express = require('express');
-const multer = require('multer');
 const app = express();
-
-// Use Render's dynamic port
+app.use(express.static('public'));
+app.get('/', (req, res) => res.sendFile('auth.html', { root: 'public' }));
+// ... rest of your code ...
 const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server running on port ${port}`));
 
 // In-memory stores (no persistent filesystem on free Render)
 let users = [];
